@@ -69,10 +69,6 @@
     "release-it": "^14.2.2",
     "typescript": "^5.7.3"
   },
-  "peerDependencies": {
-    "react": "*",
-    "react-native": "*"
-  },
   "jest": {
     "preset": "react-native",
     "modulePathIgnorePatterns": [
