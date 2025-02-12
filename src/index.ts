@@ -1,7 +1,8 @@
-import type { Frame } from 'react-native-vision-camera';
+import { NativeModules, Platform } from 'react-native';
+import { type Frame, VisionCameraProxy } from 'react-native-vision-camera';
 
 /**
- * Scans Faces.
+ * Scans QR codes.
  */
 
 type Point = { x: number; y: number };
@@ -37,9 +38,12 @@ export interface Face {
   };
 }
 
+
+const plugin = VisionCameraProxy.initFrameProcessorPlugin('scanFaces',{})
+
 export function scanFaces(frame: Frame): Face[] {
   'worklet';
   // @ts-ignore
   // eslint-disable-next-line no-undef
-  return __scanFaces(frame);
+  return plugin.call(frame);
 }
