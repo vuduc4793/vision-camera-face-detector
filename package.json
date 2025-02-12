@@ -71,8 +71,7 @@
   },
   "peerDependencies": {
     "react": "*",
-    "react-native": "*",
-    "react-native-vision-camera": ">= 2"
+    "react-native": "*"
   },
   "jest": {
     "preset": "react-native",
