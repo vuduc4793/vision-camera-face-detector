@@ -2,7 +2,7 @@ import { NativeModules, Platform } from 'react-native';
 import { type Frame, VisionCameraProxy } from 'react-native-vision-camera';
 
 /**
- * Scans QR codes.
+ * Scans Faces.
  */
 
 type Point = { x: number; y: number };
