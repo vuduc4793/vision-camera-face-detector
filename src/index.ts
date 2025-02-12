@@ -1,5 +1,5 @@
-import { NativeModules, Platform } from 'react-native';
-import { type Frame, VisionCameraProxy } from 'react-native-vision-camera';
+import type { Frame } from 'react-native-vision-camera';
+import { VisionCameraProxy } from 'react-native-vision-camera';
 
 /**
  * Scans Faces.
