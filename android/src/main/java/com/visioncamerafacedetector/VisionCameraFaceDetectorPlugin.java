@@ -7,6 +7,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.ArrayList;
 
+import com.google.code.gson.Gson;
+
 import android.annotation.SuppressLint;
 import android.graphics.PointF;
 import android.graphics.Rect;
@@ -169,7 +171,10 @@ public class VisionCameraFaceDetectorPlugin extends FrameProcessorPlugin {
 
             array.add(map);
           }
-          return array.toString();
+
+          Gson gson = new Gson();
+
+          return gson.toJson(array);
         } catch (Exception e) {
           e.printStackTrace();
         }

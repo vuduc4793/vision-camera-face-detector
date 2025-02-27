@@ -58,4 +58,5 @@ dependencies {
     api project(":react-native-vision-camera")
     implementation "androidx.camera:camera-core:1.1.0-alpha08"
     implementation 'com.google.mlkit:face-detection:16.1.5'
+    implementation 'com.google.code.gson:gson:2.12.1'
 }
