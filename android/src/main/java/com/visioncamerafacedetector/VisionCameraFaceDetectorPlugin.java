@@ -7,7 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.ArrayList;
 
-import com.google.code.gson.Gson;
+import com.google.gson.Gson;
 
 import android.annotation.SuppressLint;
 import android.graphics.PointF;
