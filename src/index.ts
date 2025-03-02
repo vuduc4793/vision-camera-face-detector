@@ -45,7 +45,7 @@ export function scanFaces(frame: Frame): Face[] {
   'worklet';
   // @ts-ignore
   // eslint-disable-next-line no-undef
-  const rawFace = plugin.call(frame);
+  const rawFace: string = plugin.call(frame);
   try {
     return JSON.parse(rawFace || '[]');
   } catch(ex) {
