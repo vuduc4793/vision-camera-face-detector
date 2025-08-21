@@ -22,7 +22,7 @@
 {
     [FrameProcessorPluginRegistry addFrameProcessorPlugin:@"scanFaces"
                                         withInitializer:^FrameProcessorPlugin* (VisionCameraProxyHolder* proxy, NSDictionary* options) {
-        return [[VisionCameraFaceDetector alloc] initWithProxy:proxy options:options];
+      return [[VisionCameraFaceDetector alloc] initWithProxy:proxy withOptions:options];
     }];
 }
 
