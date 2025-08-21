@@ -13,7 +13,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface VisionCameraFaceDetector : NSObject
 
-- (instancetype)initWithProxy:(VisionCameraProxyHolder *)proxy options:(NSDictionary * _Nullable)options;
+- (instancetype)initWithProxy:(VisionCameraProxyHolder *)proxy withOptions:(NSDictionary * _Nullable)options;
 - (NSArray * _Nullable)callback:(Frame *)frame withArguments:(NSDictionary * _Nullable)arguments;
 
 @end

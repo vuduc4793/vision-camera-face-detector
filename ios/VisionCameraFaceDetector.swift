@@ -21,9 +21,9 @@ public class VisionCameraFaceDetector: FrameProcessorPlugin {
         option.performanceMode = .accurate // doesn't work in fast mode!, why?
         return option
     }()
-    
+
     static var faceDetector = FaceDetector.faceDetector(options: FaceDetectorOption)
-    
+
     private static func processContours(from face: Face) -> [String:[[String:CGFloat]]] {
       let faceContoursTypes = [
         FaceContourType.face,
@@ -42,7 +42,7 @@ public class VisionCameraFaceDetector: FrameProcessorPlugin {
         FaceContourType.leftCheek,
         FaceContourType.rightCheek,
       ]
-      
+
       let faceContoursTypesStrings = [
         "FACE",
         "LEFT_EYEBROW_TOP",
@@ -60,31 +60,31 @@ public class VisionCameraFaceDetector: FrameProcessorPlugin {
         "LEFT_CHEEK",
         "RIGHT_CHEEK",
       ];
-      
+
       var faceContoursTypesMap: [String:[[String:CGFloat]]] = [:]
-      
+
       for i in 0..<faceContoursTypes.count {
         let contour = face.contour(ofType: faceContoursTypes[i]);
-        
+
         var pointsArray: [[String:CGFloat]] = []
-        
+
         if let points = contour?.points {
           for point in points {
             let currentPointsMap = [
                 "x": point.x,
                 "y": point.y,
             ]
-            
+
             pointsArray.append(currentPointsMap)
           }
-          
+
           faceContoursTypesMap[faceContoursTypesStrings[i]] = pointsArray
         }
       }
-      
+
       return faceContoursTypesMap
     }
-    
+
     private static func processBoundingBox(from face: Face) -> [String:Any] {
         let frameRect = face.frame
 
@@ -103,20 +103,20 @@ public class VisionCameraFaceDetector: FrameProcessorPlugin {
           "boundingCenterY": frameRect.midY
         ]
     }
-    
+
     @objc
-    public override func callback(_ frame: Frame, withArguments arguments: [AnyHashable : Any]?) -> Any! {
+    public override func callback(_ frame: Frame, withArguments arguments: [AnyHashable : Any]?) -> Any? {
         let image = VisionImage(buffer: frame.buffer)
         image.orientation = .up
-        
+
         var faceAttributes: [Any] = []
-        
+
         do {
             let faces: [Face] =  try VisionCameraFaceDetector.faceDetector.results(in: image)
             if (!faces.isEmpty){
                 for face in faces {
                     var map: [String: Any] = [:]
-                    
+
                     map["rollAngle"] = face.headEulerAngleZ  // Head is tilted sideways rotZ degrees
                     map["pitchAngle"] = face.headEulerAngleX  // Head is rotated to the uptoward rotX degrees
                     map["yawAngle"] = face.headEulerAngleY   // Head is rotated to the right rotY degrees
@@ -125,7 +125,7 @@ public class VisionCameraFaceDetector: FrameProcessorPlugin {
                     map["smilingProbability"] = face.smilingProbability
                     map["bounds"] = VisionCameraFaceDetector.processBoundingBox(from: face)
                     map["contours"] = VisionCameraFaceDetector.processContours(from: face)
-                    
+
                     faceAttributes.append(map)
                 }
             }
