@@ -12,6 +12,7 @@ export interface Face {
   yawAngle: number;
   rightEyeOpenProbability: number;
   smilingProbability: number;
+  brightness: number;
   bounds: {
     y: number;
     x: number;
