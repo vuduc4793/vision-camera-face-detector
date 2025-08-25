@@ -47,7 +47,7 @@ export function scanFaces(frame: Frame): Face[] {
   // eslint-disable-next-line no-undef
   const rawFace: Face[] = plugin.call(frame);
   try {
-    return rawFace || [];
+    return typeof rawFace === 'string' ? JSON.parse(rawFace) : (rawFace || []);
   } catch(ex) {
     return [];
   }

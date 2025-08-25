@@ -140,6 +140,22 @@ public class VisionCameraFaceDetectorPlugin extends FrameProcessorPlugin {
     return faceContoursTypesMap;
   }
 
+private float calculateBrightness(ImageProxy imageProxy) {
+    // YUV format -> Y plane = brightness
+    ImageProxy.PlaneProxy yPlane = imageProxy.getPlanes()[0];
+    java.nio.ByteBuffer buffer = yPlane.getBuffer();
+    buffer.rewind();
+
+    long sum = 0;
+    int count = buffer.remaining();
+
+    for (int i = 0; i < count; i++) {
+      sum += (buffer.get(i) & 0xFF); // convert byte to unsigned
+    }
+
+    return (float) sum / count; // giá trị trung bình [0..255]
+  }
+
   @SuppressLint("NewApi")
   @Override
   public Object callback( Frame frame, Map<String,Object> params) {
@@ -153,6 +169,7 @@ public class VisionCameraFaceDetectorPlugin extends FrameProcessorPlugin {
         List<HashMap<String, Object>> array = new ArrayList<HashMap<String, Object>>();
         try {
           List<Face> faces = Tasks.await(task);
+          float brightness = calculateBrightness(imageProxy);
           for (Face face : faces) {
             HashMap<String, Object> map = new HashMap<String, Object>();
 
@@ -162,13 +179,14 @@ public class VisionCameraFaceDetectorPlugin extends FrameProcessorPlugin {
             map.put("leftEyeOpenProbability", face.getLeftEyeOpenProbability());
             map.put("rightEyeOpenProbability", face.getRightEyeOpenProbability());
             map.put("smilingProbability", face.getSmilingProbability());
-            
+
 
             HashMap<String, Object> contours = processFaceContours(face);
             HashMap<String, Object> bounds = processBoundingBox(face.getBoundingBox());
 
             map.put("bounds", bounds);
             map.put("contours", contours);
+            map.put("brightness", brightness);
 
             array.add(map);
           }
@@ -189,6 +207,6 @@ public class VisionCameraFaceDetectorPlugin extends FrameProcessorPlugin {
 
   VisionCameraFaceDetectorPlugin(@NonNull VisionCameraProxy proxy, @Nullable Map<String, Object> options) {super();}
 
-  
+
 
 }
