@@ -23,12 +23,27 @@ public class VisionCameraFaceDetector: FrameProcessorPlugin {
   }
 
   private func denormalizeRect(_ rect: CGRect, imgW: Int, imgH: Int) -> CGRect {
-    CGRect(
-      x: rect.origin.x * CGFloat(imgW),
-      y: (1.0 - rect.origin.y - rect.height) * CGFloat(imgH),
-      width: rect.width * CGFloat(imgW),
-      height: rect.height * CGFloat(imgH)
-    )
+    let screenW = UIScreen.main.bounds.width
+    let screenH = UIScreen.main.bounds.height
+    let isPortrait = imgH > imgW
+    let imageHeight = isPortrait ? imgH : imgW
+    let imageWidth = isPortrait ? imgW : imgH
+    let virtualH = screenH
+    let virtualW = CGFloat(imageWidth) / CGFloat(imageHeight) * virtualH
+    let scale = virtualH / CGFloat(imageHeight)
+    let offsetX = (screenW - virtualW) / 2
+
+    let xImg = rect.origin.y * CGFloat(imageWidth)
+    let yImg = (1.0 - rect.origin.x - rect.height) * CGFloat(imageHeight)
+    let wImg = rect.width * CGFloat(imgW)
+    let hImg = rect.height * CGFloat(imgH)
+
+    let x = xImg * scale + offsetX
+    let y = (CGFloat(imageHeight) - yImg - (rect.height * CGFloat(imageHeight))) * scale
+    let width = (wImg * scale)
+    let height = (hImg * scale)
+
+    return CGRect(x: x, y: y, width: width, height: height)
   }
 
   private func landmarkPoints(
@@ -69,35 +84,59 @@ public class VisionCameraFaceDetector: FrameProcessorPlugin {
     return CGPoint(x: sum.x / CGFloat(points.count), y: sum.y / CGFloat(points.count))
   }
 
-  // MARK: - Estimators
+  // MARK: - Eye EAR utilities
 
-  /// Ước lượng mức mở mắt [0..1], trả nil nếu landmark không đủ điểm
-  private func estimateEyeOpen(eye: VNFaceLandmarkRegion2D?) -> CGFloat? {
-    guard let eye, eye.pointCount > 4 else { return nil }
-
-    let points = eye.normalizedPoints
-    let leftCorner = points.first!
-    let rightCorner = points[points.count / 2]
-    let upper = points[1]
-    let lower = points[points.count - 2]
-
-    let width = distance(leftCorner, rightCorner)
-    let height = distance(upper, lower)
-
-    guard width > 0 else { return nil }
-    let ratio = height / width
-
-    // Chuẩn hóa
-    let normalized = min(max((ratio - 0.15) / 0.2, 0), 1)
-
-    return normalized
+  private func pointFromNormalized(_ p: CGPoint, faceBBox: CGRect, imgW: Int, imgH: Int) -> CGPoint {
+    let nx = faceBBox.origin.x + p.x * faceBBox.width
+    let ny = faceBBox.origin.y + p.y * faceBBox.height
+    return CGPoint(x: nx * CGFloat(imgW), y: (1.0 - ny) * CGFloat(imgH))
   }
 
-  /// Trả về trạng thái OPEN / CLOSED / UNKNOWN dựa trên prob
-  private func eyeState(from prob: CGFloat?) -> String {
-    guard let prob else { return "UNKNOWN" }
-    return prob < 0.2 ? "CLOSED" : "OPEN"
+  /// Tính EAR từ 6 điểm mắt
+  private func computeEAR(from region: VNFaceLandmarkRegion2D?, faceBBox: CGRect, imgW: Int, imgH: Int) -> CGFloat? {
+    guard let region = region, region.pointCount >= 6 else { return nil }
+
+    let pts = region.normalizedPoints
+    let p1 = pointFromNormalized(pts[0], faceBBox: faceBBox, imgW: imgW, imgH: imgH)
+    let p2 = pointFromNormalized(pts[1], faceBBox: faceBBox, imgW: imgW, imgH: imgH)
+    let p3 = pointFromNormalized(pts[2], faceBBox: faceBBox, imgW: imgW, imgH: imgH)
+    let p4 = pointFromNormalized(pts[3], faceBBox: faceBBox, imgW: imgW, imgH: imgH)
+    let p5 = pointFromNormalized(pts[4], faceBBox: faceBBox, imgW: imgW, imgH: imgH)
+    let p6 = pointFromNormalized(pts[5], faceBBox: faceBBox, imgW: imgW, imgH: imgH)
+
+    let vert1 = distance(p2, p6)
+    let vert2 = distance(p3, p5)
+    let horiz = distance(p1, p4)
+    guard horiz > 0 else { return nil }
+    return (vert1 + vert2) / (2.0 * horiz)
   }
+
+  private func earToProbability(ear: CGFloat, baselineOpenEAR: CGFloat? = nil) -> CGFloat {
+    if let base = baselineOpenEAR, base > 0 {
+      let p = ear / base
+      return min(max(p, 0), 1)
+    } else {
+      let minEAR: CGFloat = 0.08
+      let maxEAR: CGFloat = 0.32
+      return min(max((ear - minEAR) / (maxEAR - minEAR), 0), 1)
+    }
+  }
+
+  private var leftEyeEMA: CGFloat = 0.0
+  private var rightEyeEMA: CGFloat = 0.0
+  private let emaAlpha: CGFloat = 0.3
+
+  private func smoothEMA(previous: CGFloat, newValue: CGFloat) -> CGFloat {
+    return previous * (1.0 - emaAlpha) + newValue * emaAlpha
+  }
+
+  private func eyeState(from prob: CGFloat) -> String {
+    if prob < 0.2 { return "CLOSED" }
+    if prob > 0.45 { return "OPEN" }
+    return "UNKNOWN"
+  }
+
+  // MARK: - Smile + Pitch + Brightness
 
   private func estimateSmile(lips: VNFaceLandmarkRegion2D?) -> CGFloat? {
     guard let lips, lips.pointCount > 5 else { return nil }
@@ -108,8 +147,10 @@ public class VisionCameraFaceDetector: FrameProcessorPlugin {
     let topMid = points[points.count / 4]
     let bottomMid = points[3 * points.count / 4]
 
-    let width = distance(leftCorner, rightCorner)
-    let height = distance(topMid, bottomMid)
+    let width = distance(CGPoint(x: CGFloat(leftCorner.x), y: CGFloat(leftCorner.y)),
+                         CGPoint(x: CGFloat(rightCorner.x), y: CGFloat(rightCorner.y)))
+    let height = distance(CGPoint(x: CGFloat(topMid.x), y: CGFloat(topMid.y)),
+                          CGPoint(x: CGFloat(bottomMid.x), y: CGFloat(bottomMid.y)))
 
     guard width > 0 else { return nil }
     let ratio = height / width
@@ -158,7 +199,7 @@ public class VisionCameraFaceDetector: FrameProcessorPlugin {
     )
 
     let (r, g, b) = (Float(bitmap[0]), Float(bitmap[1]), Float(bitmap[2]))
-    return (r + g + b) / (3 * 255.0)
+    return ((r + g + b) / (3 * 255.0)) * 100
   }
 
   // MARK: - Callback
@@ -199,9 +240,25 @@ public class VisionCameraFaceDetector: FrameProcessorPlugin {
 
         let brightness = self.estimateBrightness(from: frame.buffer)
 
-        // Eye probability & state
-        let leftProb = self.estimateEyeOpen(eye: landmarks?.leftEye)
-        let rightProb = self.estimateEyeOpen(eye: landmarks?.rightEye)
+        // Eye EAR cho 2 mắt
+        var leftEyeProb: CGFloat = 0
+        var rightEyeProb: CGFloat = 0
+        var leftEyeState = "UNKNOWN"
+        var rightEyeState = "UNKNOWN"
+
+        if let leftEAR = self.computeEAR(from: landmarks?.leftEye, faceBBox: face.boundingBox, imgW: imgW, imgH: imgH) {
+          let probRaw = self.earToProbability(ear: leftEAR)
+          self.leftEyeEMA = self.smoothEMA(previous: self.leftEyeEMA, newValue: probRaw)
+          leftEyeProb = self.leftEyeEMA
+          leftEyeState = self.eyeState(from: leftEyeProb)
+        }
+
+        if let rightEAR = self.computeEAR(from: landmarks?.rightEye, faceBBox: face.boundingBox, imgW: imgW, imgH: imgH) {
+          let probRaw = self.earToProbability(ear: rightEAR)
+          self.rightEyeEMA = self.smoothEMA(previous: self.rightEyeEMA, newValue: probRaw)
+          rightEyeProb = self.rightEyeEMA
+          rightEyeState = self.eyeState(from: rightEyeProb)
+        }
 
         var map: [String: Any] = [
           "rollAngle": self.degrees(from: face.roll?.doubleValue) ?? NSNull(),
@@ -209,11 +266,11 @@ public class VisionCameraFaceDetector: FrameProcessorPlugin {
           "yawAngle": self.degrees(from: face.yaw?.doubleValue) ?? NSNull(),
           "bounds": self.boundingBoxDict(bbox),
           "contours": contours,
-          "brightness": brightness * 100,
-          "leftEyeOpenProbability": leftProb ?? NSNull(),
-          "rightEyeOpenProbability": rightProb ?? NSNull(),
-          "leftEyeState": self.eyeState(from: leftProb),
-          "rightEyeState": self.eyeState(from: rightProb),
+          "brightness": brightness,
+          "leftEyeOpenProbability": leftEyeProb,
+          "rightEyeOpenProbability": rightEyeProb,
+          "leftEyeState": leftEyeState,
+          "rightEyeState": rightEyeState,
           "smilingProbability": self.estimateSmile(lips: landmarks?.outerLips) ?? NSNull()
         ]
 
