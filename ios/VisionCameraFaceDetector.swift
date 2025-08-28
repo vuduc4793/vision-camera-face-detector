@@ -279,8 +279,23 @@ public class VisionCameraFaceDetector: FrameProcessorPlugin {
       }
     }
 
-    let handler = VNImageRequestHandler(cmSampleBuffer: frame.buffer, orientation: .up)
-    do { try handler.perform([request]) } catch { return nil }
+    do {
+      if #available(iOS 14.0, *) {
+        let handler = VNImageRequestHandler(cmSampleBuffer: frame.buffer,
+                                            orientation: .up,
+                                            options: [:])
+        try handler.perform([request])
+      } else {
+        if let pixelBuffer = CMSampleBufferGetImageBuffer(frame.buffer) {
+          let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer,
+                                              orientation: .up,
+                                              options: [:])
+          try handler.perform([request])
+        }
+      }
+    } catch {
+      return nil
+    }
 
     return faceAttributes
   }
