@@ -1,4 +1,5 @@
 import Vision
+import VisionCamera
 import UIKit
 import AVFoundation
 import CoreML
